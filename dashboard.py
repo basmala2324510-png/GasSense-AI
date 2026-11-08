@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import os
@@ -78,9 +79,12 @@ with st.sidebar:
     st.caption("Smart Industrial Safety System")
 
 # Refresh
-if st.button("🔄 Refresh Readings"):
+if st.button("Refresh Readings"):
     st.rerun()
 
+st.caption("Public Dashboard | Displays the latest data available in the deployed project.")
+
+# Load dataset
 st.header("System Overview")
 
 FILE_NAME = "gas_data.csv"
@@ -91,7 +95,7 @@ data = pd.DataFrame()
 if os.path.exists(FILE_NAME) and os.path.getsize(FILE_NAME) > 0:
     try:
         data = pd.read_csv(FILE_NAME)
-    except pd.errors.EmptyDataError:
+    except (pd.errors.EmptyDataError, pd.errors.ParserError):
         data = pd.DataFrame()
 
 if data.empty:
@@ -100,10 +104,11 @@ if data.empty:
     col2.metric("Temperature", "--")
     col3.metric("Humidity", "--")
 
-    st.info("⏳ Waiting for real sensor readings...")
+    st.info("Waiting for sensor readings...")
 
 else:
     if all(col in data.columns for col in features):
+
         latest = data.iloc[-1]
 
         col1, col2, col3 = st.columns(3)
@@ -112,29 +117,49 @@ else:
         col3.metric("Humidity", latest["humidity"])
 
         st.divider()
+        st.header("System Status")
+
+        if "status" in data.columns:
+            status = str(latest["status"]).upper()
+
+            if status == "NORMAL":
+                st.success("System Status: NORMAL")
+            elif status == "WARNING":
+                st.warning("System Status: WARNING")
+            elif status == "DANGER":
+                st.error("System Status: DANGER")
+            else:
+                st.info("System Status: UNCLASSIFIED")
+
+        st.divider()
         st.header("AI Analysis")
 
-        model_file = "best_gassense_model.pkl"
+        model_file = "gassense_model.pkl"
 
         if not os.path.exists(model_file):
-            model_file = "gassense_model.pkl"
+            model_file = "best_gassense_model.pkl"
 
         if os.path.exists(model_file):
             try:
                 model = joblib.load(model_file)
+
                 reading = pd.DataFrame(
                     [[latest[col] for col in features]],
                     columns=features
                 )
+
                 prediction = model.predict(reading)[0]
                 st.success(f"AI Predicted Status: {prediction}")
-            except Exception:
+
+            except Exception as error:
                 st.warning("Unable to generate AI prediction.")
+
         else:
-            st.warning("AI model is not trained yet.")
+            st.info("AI model is not trained yet.")
 
         st.divider()
         st.header("Sensor Data Trends")
+
         st.line_chart(data[features].tail(20))
 
         st.header("Recent Readings")
@@ -143,12 +168,15 @@ else:
     else:
         st.error("Dataset columns are incomplete.")
 
-# Footer
 st.divider()
+
 st.markdown("""
 <div style="text-align:center; padding:20px;">
     <h3 style="color:#56C9C0;">GasSense AI</h3>
     <p>Developed by Basmala Ahmed & Dai Khalid Ahmed</p>
     <p style="color:#AABBCB;">Grade 12 | Group 23319 | 2026/2027</p>
+    <p style="color:#AABBCB;">
+        Educational Prototype - Simulation and Monitoring Dashboard
+    </p>
 </div>
 """, unsafe_allow_html=True)
